@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4 # Firestore/Storage emulators need Java
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: App — install & typecheck
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+      - name: Unit tests
+        run: |
+          npm ci --prefix tests
+          npm test
+
+      - name: Security rules tests (Firestore + Storage emulators)
+        run: npm run test:rules
+
+      - name: Cloud Functions — build & tests
+        run: |
+          npm ci --prefix functions
+          npm --prefix functions run build
+          npm run test:functions

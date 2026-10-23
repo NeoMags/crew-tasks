@@ -1,0 +1,261 @@
+rules_version = '2';
+
+// Crew Tasks — server-side authorization. The app's UI checks are convenience only;
+// everything below is what actually protects the data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function me() { return request.auth.uid; }
+    function str(v, max) { return v is string && v.size() <= max; }
+    function nonEmpty(v, max) { return str(v, max) && v.trim().size() > 0; }
+
+    function groupPath(gid) { return /databases/$(database)/documents/groups/$(gid); }
+    function taskPath(tid) { return /databases/$(database)/documents/tasks/$(tid); }
+    function groupData(gid) { return get(groupPath(gid)).data; }
+    function isMemberOf(g) { return me() in g.memberIds; }
+    function isAdminOf(g) { return isMemberOf(g) && g.members[me()].role in ['owner', 'admin']; }
+
+    // ---------- users ----------
+    match /users/{userId} {
+      allow read: if signedIn() && me() == userId;
+      allow create, update: if signedIn() && me() == userId
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'createdAt'])
+        && nonEmpty(request.resource.data.displayName, 50);
+      allow delete: if false;
+
+      // FCM tokens, read only by Cloud Functions (admin SDK bypasses rules).
+      match /devices/{deviceId} {
+        allow read, delete: if signedIn() && me() == userId;
+        allow create, update: if signedIn() && me() == userId
+          && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+          && nonEmpty(request.resource.data.token, 4096)
+          && str(request.resource.data.platform, 20);
+      }
+    }
+
+    // ---------- invite codes ----------
+    // Readable one-by-one (you must know the code); never listable.
+    match /inviteCodes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['groupId', 'createdBy', 'expiresAt'])
+        && request.resource.data.createdBy == me()
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt < request.time + duration.value(8, 'd')
+        // The group (as it will be after this write/batch) must point at this code, and I must administer it.
+        && getAfter(groupPath(request.resource.data.groupId)).data.inviteCode == code
+        && isAdminOf(getAfter(groupPath(request.resource.data.groupId)).data);
+      allow delete: if signedIn() && isAdminOf(groupData(resource.data.groupId));
+      allow update: if false;
+    }
+
+    // ---------- groups ----------
+    match /groups/{gid} {
+      function validGroupFields(g) {
+        return nonEmpty(g.name, 60)
+          && str(g.description, 300)
+          && g.memberIds is list && g.memberIds.size() <= 50
+          && g.members is map
+          && g.members.keys().toSet() == g.memberIds.toSet()
+          && g.inviteCode is string
+          && g.inviteExpiresAt is timestamp
+          && g.inviteExpiresAt < request.time + duration.value(8, 'd');
+      }
+
+      // A non-member adds only themselves, as 'member', proving they know the current invite code.
+      function isJoin() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return !(me() in before.memberIds)
+          && after.diff(before).affectedKeys().hasOnly(['memberIds', 'members', 'joinCodeUsed', 'updatedAt'])
+          && after.joinCodeUsed == before.inviteCode
+          && before.inviteExpiresAt > request.time
+          && after.memberIds.size() == before.memberIds.size() + 1
+          && after.memberIds.toSet() == before.memberIds.toSet().union([me()].toSet())
+          && after.memberIds.size() <= 50
+          && after.members.diff(before.members).affectedKeys() == [me()].toSet()
+          && after.members[me()].keys().hasOnly(['name', 'role'])
+          && after.members[me()].role == 'member'
+          && nonEmpty(after.members[me()].name, 50);
+      }
+
+      // A non-owner member removes only themselves.
+      function isLeave() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return me() in before.memberIds
+          && me() != before.ownerId
+          && after.diff(before).affectedKeys().hasOnly(['memberIds', 'members', 'updatedAt'])
+          && after.memberIds.toSet() == before.memberIds.toSet().difference([me()].toSet())
+          && after.memberIds.size() == before.memberIds.size() - 1
+          && after.members.diff(before.members).affectedKeys() == [me()].toSet()
+          && !(me() in after.members);
+      }
+
+      // A member updates only their own display name.
+      function isRenameSelf() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return me() in before.memberIds
+          && after.diff(before).affectedKeys().hasOnly(['members', 'updatedAt'])
+          && after.members.diff(before.members).affectedKeys() == [me()].toSet()
+          && after.members[me()].keys().hasOnly(['name', 'role'])
+          && after.members[me()].role == before.members[me()].role
+          && nonEmpty(after.members[me()].name, 50);
+      }
+
+      // Admins: rename, rotate invite, remove members. Only the owner may change roles.
+      // Nobody can add members this way (joining requires an invite code).
+      function isAdminUpdate() {
+        let before = resource.data;
+        let after = request.resource.data;
+        let membersDiff = after.members.diff(before.members);
+        return isAdminOf(before)
+          && after.diff(before).affectedKeys()
+               .hasOnly(['name', 'description', 'memberIds', 'members', 'inviteCode', 'inviteExpiresAt', 'updatedAt'])
+          && validGroupFields(after)
+          && after.memberIds.toSet().difference(before.memberIds.toSet()).size() == 0
+          && before.ownerId in after.memberIds
+          && after.members[before.ownerId].role == 'owner'
+          && membersDiff.addedKeys().size() == 0
+          && (membersDiff.changedKeys().size() == 0 || before.ownerId == me())
+          && (after.inviteCode == before.inviteCode
+              || existsAfter(/databases/$(database)/documents/inviteCodes/$(after.inviteCode)));
+      }
+
+      allow read: if signedIn() && isMemberOf(resource.data);
+      allow create: if signedIn()
+        && request.resource.data.keys()
+             .hasOnly(['name', 'description', 'ownerId', 'memberIds', 'members', 'inviteCode', 'inviteExpiresAt', 'createdAt', 'updatedAt'])
+        && validGroupFields(request.resource.data)
+        && request.resource.data.ownerId == me()
+        && request.resource.data.memberIds == [me()]
+        && request.resource.data.members[me()].keys().hasOnly(['name', 'role'])
+        && request.resource.data.members[me()].role == 'owner'
+        && nonEmpty(request.resource.data.members[me()].name, 50)
+        && existsAfter(/databases/$(database)/documents/inviteCodes/$(request.resource.data.inviteCode));
+      allow update: if signedIn() && (isJoin() || isLeave() || isRenameSelf() || isAdminUpdate());
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+
+    // ---------- tasks ----------
+    match /tasks/{tid} {
+      function validTask(t) {
+        return t.keys().hasOnly([
+            'groupId', 'groupName', 'title', 'description', 'assigneeIds', 'createdBy', 'createdByName',
+            'status', 'blockedReason', 'requiresApproval', 'priority', 'progress', 'dueAt', 'recurrence',
+            'checklist', 'attachments', 'nextTaskId', 'recurredFrom', 'overdueNotified', 'updatedBy',
+            'createdAt', 'updatedAt', 'completedAt'])
+          && t.groupId is string
+          && str(t.groupName, 60)
+          && nonEmpty(t.title, 120)
+          && str(t.description, 2000)
+          && t.assigneeIds is list && t.assigneeIds.size() <= 20
+          && str(t.createdByName, 50)
+          && t.status in ['todo', 'in_progress', 'blocked', 'review', 'done']
+          && str(t.blockedReason, 300)
+          && t.requiresApproval is bool
+          && t.priority in ['low', 'medium', 'high', 'urgent']
+          && t.progress is int && t.progress >= 0 && t.progress <= 100
+          && (t.dueAt == null || t.dueAt is timestamp)
+          && t.recurrence in ['none', 'daily', 'weekly', 'monthly']
+          && (t.recurrence == 'none' || t.dueAt != null)
+          && t.checklist is list && t.checklist.size() <= 50
+          && t.attachments is list && t.attachments.size() <= 10
+          && t.overdueNotified is bool;
+      }
+
+      // Next occurrence of a recurring task, created in the same transaction that completes the previous one.
+      function isRecurrenceCreate() {
+        let t = request.resource.data;
+        let prev = getAfter(taskPath(t.recurredFrom)).data;
+        return t.recurredFrom is string
+          && prev.nextTaskId == tid
+          && prev.createdBy == t.createdBy
+          && prev.groupId == t.groupId
+          && prev.status == 'done';
+      }
+
+      function canReadTask(t) {
+        return me() in t.assigneeIds || t.createdBy == me() || isMemberOf(groupData(t.groupId));
+      }
+
+      function canUpdateTask() {
+        let before = resource.data;
+        let after = request.resource.data;
+        let g = groupData(before.groupId);
+        let keys = after.diff(before).affectedKeys();
+        let editor = before.createdBy == me() || isAdminOf(g);
+        let worker = me() in before.assigneeIds || editor;
+        let anyKeys = ['checklist', 'attachments', 'updatedAt', 'updatedBy'];
+        let workKeys = ['status', 'progress', 'blockedReason', 'completedAt', 'nextTaskId'];
+        let detailKeys = ['title', 'description', 'assigneeIds', 'priority', 'dueAt', 'recurrence',
+                          'requiresApproval', 'overdueNotified'];
+        return isMemberOf(g)
+          && validTask(after)
+          && after.updatedBy == me()
+          && (keys.hasOnly(anyKeys)
+              // Any member may pick up an unassigned task for themselves.
+              || (keys.hasOnly(anyKeys.concat(['assigneeIds'])) && before.assigneeIds.size() == 0
+                  && after.assigneeIds == [me()])
+              || (worker && keys.hasOnly(anyKeys.concat(workKeys)))
+              || (editor && keys.hasOnly(anyKeys.concat(workKeys).concat(detailKeys))))
+          // Approval flow: only the assigner/admins can mark an approval-required task Done.
+          && (!('status' in keys) || after.status != 'done' || !before.requiresApproval || editor)
+          && (!('assigneeIds' in keys) || g.memberIds.hasAll(after.assigneeIds))
+          && (!('nextTaskId' in keys)
+              || (before.nextTaskId == null && after.nextTaskId is string && existsAfter(taskPath(after.nextTaskId))))
+          && (!('overdueNotified' in keys) || after.overdueNotified == false);
+      }
+
+      allow read: if signedIn() && canReadTask(resource.data);
+      allow create: if signedIn()
+        && validTask(request.resource.data)
+        && isMemberOf(groupData(request.resource.data.groupId))
+        && groupData(request.resource.data.groupId).memberIds.hasAll(request.resource.data.assigneeIds)
+        && request.resource.data.updatedBy == me()
+        && request.resource.data.status == 'todo'
+        && request.resource.data.progress == 0
+        && request.resource.data.nextTaskId == null
+        && request.resource.data.overdueNotified == false
+        && request.resource.data.attachments.size() == 0
+        && ((request.resource.data.createdBy == me() && request.resource.data.recurredFrom == null)
+            || isRecurrenceCreate());
+      allow update: if signedIn() && canUpdateTask();
+      allow delete: if signedIn()
+        && (resource.data.createdBy == me() || isAdminOf(groupData(resource.data.groupId)));
+
+      match /comments/{cid} {
+        allow read: if signedIn() && canReadTask(get(taskPath(tid)).data);
+        allow create: if signedIn()
+          && isMemberOf(groupData(get(taskPath(tid)).data.groupId))
+          && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'text', 'mentions', 'createdAt'])
+          && request.resource.data.authorId == me()
+          && str(request.resource.data.authorName, 50)
+          && nonEmpty(request.resource.data.text, 1000)
+          && request.resource.data.mentions is list && request.resource.data.mentions.size() <= 20
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn() && resource.data.authorId == me();
+        allow update: if false;
+      }
+
+      // Append-only audit trail written alongside each change (getAfter: the task may be created in the same batch).
+      match /activity/{aid} {
+        allow read: if signedIn() && canReadTask(get(taskPath(tid)).data);
+        allow create: if signedIn()
+          && isMemberOf(groupData(getAfter(taskPath(tid)).data.groupId))
+          && request.resource.data.keys().hasOnly(['actorId', 'actorName', 'type', 'message', 'createdAt'])
+          && request.resource.data.actorId == me()
+          && str(request.resource.data.actorName, 50)
+          && request.resource.data.type in
+               ['created', 'status', 'progress', 'assigned', 'edited', 'checklist', 'attachment', 'recurred']
+          && str(request.resource.data.message, 600)
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

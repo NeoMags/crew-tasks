@@ -39,3 +39,14 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+/android
+
+# Secrets / per-project Firebase config (provide via env or EAS secrets)
+.env
+google-services.json
+functions/lib/
+functions/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebaserc

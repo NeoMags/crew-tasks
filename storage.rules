@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Task attachments: tasks/{taskId}/{file}. Only members of the task's group may read,
+// upload or delete. Requires Storage → Firestore cross-service access (granted on first deploy).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /tasks/{taskId}/{fileName} {
+      function task() {
+        return firestore.get(/databases/(default)/documents/tasks/$(taskId)).data;
+      }
+      function isMember() {
+        return request.auth != null
+          && request.auth.uid in firestore.get(/databases/(default)/documents/groups/$(task().groupId)).data.memberIds;
+      }
+      allow read, delete: if isMember();
+      allow create: if isMember()
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+      allow update: if false;
+    }
+  }
+}

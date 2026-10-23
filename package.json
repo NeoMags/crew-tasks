@@ -1,22 +1,43 @@
 {
   "name": "crew-tasks",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "9.2.1",
     "expo": "~58.0.17",
+    "expo-build-properties": "~58.0.11",
+    "expo-clipboard": "~58.0.4",
+    "expo-constants": "~58.0.13",
+    "expo-device": "~58.0.5",
+    "expo-image-picker": "~58.0.10",
+    "expo-linking": "~58.0.14",
+    "expo-notifications": "~58.1.6",
+    "expo-router": "~58.0.25",
     "expo-status-bar": "~58.0.4",
+    "expo-system-ui": "~58.0.6",
+    "firebase": "^13.1.0",
     "react": "19.3.0",
-    "react-native": "0.88.0"
+    "react-dom": "19.3.0",
+    "react-native": "0.88.0",
+    "react-native-safe-area-context": "~5.10.1",
+    "react-native-screens": "~4.30.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.5",
     "@types/react": "~19.3.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint",
+    "test": "npm --prefix tests run test:unit",
+    "test:rules": "npm --prefix tests run test:rules",
+    "test:functions": "npm --prefix functions test",
+    "build:apk:local": "expo prebuild --platform android --no-install && cd android && ./gradlew assembleRelease"
   },
   "private": true
 }
