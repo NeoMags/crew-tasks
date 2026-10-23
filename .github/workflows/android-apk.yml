@@ -7,6 +7,11 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      smoke_test:
+        description: 'Build with placeholder Firebase config (checks the build only; the APK will not connect)'
+        type: boolean
+        default: false
   push:
     tags: ['v*']
 
@@ -32,6 +37,13 @@ jobs:
       EXPO_PUBLIC_ATTACHMENTS: ${{ vars.ATTACHMENTS }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Placeholder config for smoke test
+        if: inputs.smoke_test
+        run: |
+          for v in API_KEY AUTH_DOMAIN PROJECT_ID STORAGE_BUCKET MESSAGING_SENDER_ID APP_ID; do
+            echo "EXPO_PUBLIC_FIREBASE_$v=smoke-test" >> "$GITHUB_ENV"
+          done
 
       - name: Check required secrets
         run: |
