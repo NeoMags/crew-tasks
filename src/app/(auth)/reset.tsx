@@ -62,7 +62,7 @@ export default function ResetPassword() {
               error={error}
             />
             <Button title="Email me a code" onPress={sendCode} loading={busy} />
-            <Muted>We'll send a 6-digit code. It expires in 10 minutes.</Muted>
+            <Muted>We’ll send a 6-digit code. It expires in 10 minutes.</Muted>
           </>
         ) : (
           <>

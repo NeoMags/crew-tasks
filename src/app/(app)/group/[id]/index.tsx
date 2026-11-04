@@ -2,6 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, Share, Text, View } from 'react-native';
 import { TaskRow } from '../../../../components/TaskRow';
+import { useNow } from '../../../../hooks/useNow';
 import { Avatar, Button, Chip, EmptyState, ErrorBanner, IconButton, Loading } from '../../../../components/ui';
 import { useGroup, useGroupTasks } from '../../../../hooks/data';
 import { useUser } from '../../../../lib/auth';
@@ -20,7 +21,7 @@ export default function GroupBoard() {
   const tasks = useGroupTasks(id);
   const [status, setStatus] = useState<StatusFilter>('open');
   const [member, setMember] = useState<string | null>(null);
-  const now = Date.now();
+  const now = useNow();
 
   const perMember = useMemo(() => {
     const g = group.data;

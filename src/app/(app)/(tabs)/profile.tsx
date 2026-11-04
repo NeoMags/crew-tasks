@@ -10,6 +10,21 @@ import { registerForPush } from '../../../lib/push';
 import { getAutoRemindersEnabled, setAutoRemindersEnabled } from '../../../lib/reminders';
 import { space, useTheme } from '../../../theme';
 
+async function readNotificationState() {
+  const p = await Notifications.getPermissionsAsync();
+  const exact =
+    Platform.OS === 'android'
+      ? await Notifications.getExactAlarmPermissionsAsync()
+          .then((e) => e.granted)
+          .catch(() => null)
+      : null;
+  return {
+    notif: p.status as 'granted' | 'denied' | 'undetermined',
+    exact,
+    auto: await getAutoRemindersEnabled(),
+  };
+}
+
 export default function Profile() {
   const c = useTheme();
   const user = useUser();
@@ -20,18 +35,21 @@ export default function Profile() {
   const [exact, setExact] = useState<boolean | null>(null);
   const [auto, setAuto] = useState(true);
 
-  const refresh = useCallback(async () => {
-    const p = await Notifications.getPermissionsAsync();
-    setNotif(p.status as typeof notif);
-    if (Platform.OS === 'android') {
-      const e = await Notifications.getExactAlarmPermissionsAsync().catch(() => null);
-      setExact(e ? e.granted : null);
-    }
-    setAuto(await getAutoRemindersEnabled());
-  }, []);
+  // Reads permission/settings state, then applies it once the reads finish.
+  const refresh = useCallback(
+    () =>
+      readNotificationState()
+        .then((s) => {
+          setNotif(s.notif);
+          setExact(s.exact);
+          setAuto(s.auto);
+        })
+        .catch(() => {}),
+    [],
+  );
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   const enablePush = () =>
@@ -111,7 +129,7 @@ export default function Profile() {
         </View>
         {Platform.OS === 'android' ? (
           <Muted style={{ marginTop: space.sm }}>
-            Not getting notifications on Xiaomi, Oppo, Vivo, Realme or OnePlus? Set Battery → "No restrictions" for Crew Tasks
+            Not getting notifications on Xiaomi, Oppo, Vivo, Realme or OnePlus? Set Battery → “No restrictions” for Crew Tasks
             and allow Autostart.
           </Muted>
         ) : null}

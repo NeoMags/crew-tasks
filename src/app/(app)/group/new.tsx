@@ -41,7 +41,7 @@ export default function NewGroup() {
           })
         }
       />
-      <Muted>You'll get an invite code to share with friends.</Muted>
+      <Muted>You’ll get an invite code to share with friends.</Muted>
     </Screen>
   );
 }

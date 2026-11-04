@@ -15,10 +15,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install & typecheck
+      - name: Install, typecheck & lint
         run: |
           npm ci
           npx tsc --noEmit
+          npx expo lint
       - name: Bundle Android JS (catches import/resolution errors)
         env:
           EXPO_PUBLIC_API_URL: https://ci.invalid

@@ -64,7 +64,7 @@ jobs:
       - name: Typecheck app
         run: npx tsc --noEmit
 
-      - name: Write google-services.json (optional: enables background push on Android)
+      - name: 'Write google-services.json (optional: enables background push on Android)'
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |

@@ -82,7 +82,7 @@ function MissingConfig() {
     <View style={{ flex: 1, padding: 24, justifyContent: 'center', gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>Server address missing</Text>
       <Text>
-        This build doesn't know where the Crew Tasks API is. Set EXPO_PUBLIC_API_URL (your Vercel deployment URL, see
+        This build doesn’t know where the Crew Tasks API is. Set EXPO_PUBLIC_API_URL (your Vercel deployment URL, see
         README) and rebuild.
       </Text>
     </View>

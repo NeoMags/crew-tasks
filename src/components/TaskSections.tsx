@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { useAction, useActivity, useComments } from '../hooks/data';
+import { useNow } from '../hooks/useNow';
 import type { AppUser } from '../lib/auth';
 import { allowedStatuses, canEditDetails, canWorkOn, checklistProgress, formatDue, LIMITS } from '@shared/logic';
 import { addCustomReminder, cancelCustomReminder, listCustomReminders } from '../lib/reminders';
@@ -130,7 +131,7 @@ export function ChecklistSection({ task, user }: Props) {
 
   return (
     <>
-      <SectionTitle right={total ? <Muted>{done}/{total} furnished</Muted> : null}>What's needed</SectionTitle>
+      <SectionTitle right={total ? <Muted>{done}/{total} furnished</Muted> : null}>What’s needed</SectionTitle>
       <Card style={{ gap: space.md }}>
         {task.checklist.length === 0 ? <Muted>Nothing listed. Add documents, money, items or info that must be furnished.</Muted> : null}
         {task.checklist.map((item) => (
@@ -277,6 +278,7 @@ export function RemindersSection({ task }: Props) {
     return d;
   };
   const due = task.dueAt ? Date.parse(task.dueAt) : null;
+  const now = useNow();
 
   if (task.status === 'done') return null;
   return (
@@ -286,7 +288,7 @@ export function RemindersSection({ task }: Props) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
           <Chip label="In 1 hour" onPress={() => add(inOneHour())} />
           <Chip label="Tomorrow 9 AM" onPress={() => add(tomorrow9())} />
-          {due && due - 86_400_000 > Date.now() ? <Chip label="1 day before due" onPress={() => add(new Date(due - 86_400_000))} /> : null}
+          {due && due - 86_400_000 > now ? <Chip label="1 day before due" onPress={() => add(new Date(due - 86_400_000))} /> : null}
           <Chip label="Pick time…" onPress={() => pickDateTime(inOneHour(), add)} />
         </View>
         {list.map((r) => (
