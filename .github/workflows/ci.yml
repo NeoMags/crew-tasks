@@ -6,35 +6,52 @@ on:
   pull_request:
 
 jobs:
-  test:
+  app:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-java@v4 # Firestore/Storage emulators need Java
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: App — install & typecheck
+      - name: Install & typecheck
         run: |
           npm ci
           npx tsc --noEmit
+      - name: Bundle Android JS (catches import/resolution errors)
+        env:
+          EXPO_PUBLIC_API_URL: https://ci.invalid
+        run: npx expo export --platform android --output-dir /tmp/expo-export
 
-      - name: Unit tests
-        run: |
-          npm ci --prefix tests
-          npm test
-
-      - name: Security rules tests (Firestore + Storage emulators)
-        run: npm run test:rules
-
-      - name: Cloud Functions — build & tests
-        run: |
-          npm ci --prefix functions
-          npm --prefix functions run build
-          npm run test:functions
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: server
+    env:
+      TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: API + logic tests (real Postgres)
+        run: npm test

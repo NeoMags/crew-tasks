@@ -5,7 +5,7 @@ import { Alert, Linking, Platform, Switch, Text, View } from 'react-native';
 import { Avatar, Body, Button, Card, Muted, Screen, SectionTitle, TextField } from '../../../components/ui';
 import { useAction } from '../../../hooks/data';
 import { useAuth, useUser } from '../../../lib/auth';
-import { LIMITS } from '../../../lib/logic';
+import { LIMITS } from '@shared/logic';
 import { registerForPush } from '../../../lib/push';
 import { getAutoRemindersEnabled, setAutoRemindersEnabled } from '../../../lib/reminders';
 import { space, useTheme } from '../../../theme';
@@ -42,10 +42,10 @@ export default function Profile() {
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open settings', onPress: () => Linking.openSettings() },
         ]);
-      } else if (!r.ok && r.reason === 'token-error') {
+      } else if (!r.ok && (r.reason === 'token-error' || r.reason === 'not-configured')) {
         Alert.alert(
           'Push not available in this build',
-          'Reminders on this phone still work. Server push needs google-services.json in the build (see README).',
+          'Reminders and the in-app Inbox still work. Background push needs an EAS project id and google-services.json in the build (see README).',
         );
       }
       await refresh();

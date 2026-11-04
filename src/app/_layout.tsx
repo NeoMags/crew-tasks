@@ -6,7 +6,8 @@ import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Loading } from '../components/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
-import { isFirebaseConfigured, missingFirebaseConfig } from '../lib/firebase';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { isApiConfigured, queryClient, wireAppLifecycle } from '../lib/api';
 import { ensureChannels, registerForPush, watchPushToken } from '../lib/push';
 import { useTheme } from '../theme';
 
@@ -46,6 +47,7 @@ function RootNavigator() {
 
   useEffect(() => {
     ensureChannels().catch(() => {});
+    return wireAppLifecycle();
   }, []);
 
   useEffect(() => {
@@ -78,10 +80,10 @@ function RootNavigator() {
 function MissingConfig() {
   return (
     <View style={{ flex: 1, padding: 24, justifyContent: 'center', gap: 12 }}>
-      <Text style={{ fontSize: 20, fontWeight: '700' }}>Firebase is not configured</Text>
+      <Text style={{ fontSize: 20, fontWeight: '700' }}>Server address missing</Text>
       <Text>
-        This build is missing: {missingFirebaseConfig.join(', ')}. Set the EXPO_PUBLIC_FIREBASE_* variables (see
-        README → Configure) and rebuild.
+        This build doesn't know where the Crew Tasks API is. Set EXPO_PUBLIC_API_URL (your Vercel deployment URL, see
+        README) and rebuild.
       </Text>
     </View>
   );
@@ -91,10 +93,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      {isFirebaseConfigured ? (
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
+      {isApiConfigured ? (
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <RootNavigator />
+          </AuthProvider>
+        </QueryClientProvider>
       ) : (
         <MissingConfig />
       )}

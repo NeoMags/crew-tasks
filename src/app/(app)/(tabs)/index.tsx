@@ -5,10 +5,10 @@ import { TaskRow } from '../../../components/TaskRow';
 import { Button, Chip, EmptyState, ErrorBanner, IconButton, Loading } from '../../../components/ui';
 import { useAssignedTasks, useCreatedTasks, useMyGroups } from '../../../hooks/data';
 import { useUser } from '../../../lib/auth';
-import { compareTasks, isDueToday, isOpen, isOverdue } from '../../../lib/logic';
+import { compareTasks, isDueToday, isOpen, isOverdue } from '@shared/logic';
 import { syncAutoReminders } from '../../../lib/reminders';
 import { createdMs, dueMs } from '../../../lib/tasks';
-import type { Task } from '../../../lib/types';
+import type { Task } from '@shared/types';
 import { radius, space, STATUS_COLOR, useTheme } from '../../../theme';
 
 type Scope = 'assigned' | 'created';

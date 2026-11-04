@@ -6,7 +6,7 @@ import { Avatar, Body, Button, Card, ErrorBanner, Loading, Muted, Screen, Sectio
 import { useAction, useGroup } from '../../../../hooks/data';
 import { useUser } from '../../../../lib/auth';
 import { deleteGroup, regenerateInvite, removeMember, setMemberRole, updateGroupInfo } from '../../../../lib/groups';
-import { isAdmin, LIMITS } from '../../../../lib/logic';
+import { isAdmin, LIMITS } from '@shared/logic';
 import { space, useTheme } from '../../../../theme';
 
 export default function GroupSettings() {
@@ -31,7 +31,7 @@ export default function GroupSettings() {
   const g = group.data;
   const admin = isAdmin(g, user.uid);
   const owner = g.ownerId === user.uid;
-  const expires = g.inviteExpiresAt.toDate();
+  const expires = new Date(g.inviteExpiresAt);
   const expired = expires.getTime() < Date.now();
 
   const confirm = (title: string, msg: string, action: string, fn: () => void) =>

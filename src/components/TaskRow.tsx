@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { checklistProgress, formatDue, isOverdue } from '../lib/logic';
+import { checklistProgress, formatDue, isOverdue } from '@shared/logic';
 import { dueMs } from '../lib/tasks';
-import { PRIORITY_LABEL, STATUS_LABEL, type Group, type Task } from '../lib/types';
+import { PRIORITY_LABEL, STATUS_LABEL, type Group, type Task } from '@shared/types';
 import { PRIORITY_COLOR, radius, space, STATUS_COLOR, useTheme } from '../theme';
 import { Avatar, Pill, ProgressBar } from './ui';
 

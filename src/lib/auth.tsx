@@ -1,16 +1,6 @@
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  signOut as fbSignOut,
-  updateProfile,
-  type User,
-} from 'firebase/auth';
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { fbAuth, fbDb } from './firebase';
-import { LIMITS, trimTo } from './logic';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
+import { LIMITS, trimTo } from '@shared/logic';
+import { afterMutation, api, authClient, onUnauthorized, queryClient } from './api';
 import { unregisterThisDevice } from './push';
 import { cancelAllTaskReminders } from './reminders';
 
@@ -25,79 +15,70 @@ interface AuthState {
   initializing: boolean;
   signIn(email: string, password: string): Promise<void>;
   signUp(name: string, email: string, password: string): Promise<void>;
-  resetPassword(email: string): Promise<void>;
   updateName(name: string): Promise<void>;
   signOut(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
 
-function toAppUser(u: User): AppUser {
-  return {
-    uid: u.uid,
-    email: u.email ?? '',
-    displayName: u.displayName || (u.email ? u.email.split('@')[0] : 'Friend'),
-  };
+class AuthError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function check(result: { error?: { code?: string; message?: string; status?: number } | null }) {
+  if (result.error) {
+    throw new AuthError(result.error.code ?? String(result.error.status ?? ''), result.error.message ?? 'Something went wrong.');
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [initializing, setInitializing] = useState(true);
+  const session = authClient.useSession();
+  const u = session.data?.user;
+  const user = useMemo<AppUser | null>(
+    () => (u ? { uid: u.id, email: u.email, displayName: u.name || u.email.split('@')[0] || 'Friend' } : null),
+    [u?.id, u?.email, u?.name], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
+  // If the API rejects the session (expired / revoked), re-check so the app returns to sign-in.
   useEffect(() => {
-    return onAuthStateChanged(fbAuth(), (u) => {
-      setUser(u ? toAppUser(u) : null);
-      setInitializing(false);
-    });
-  }, []);
+    const off = onUnauthorized(() => void session.refetch());
+    return () => void off();
+  }, [session]);
 
   const value = useMemo<AuthState>(
     () => ({
       user,
-      initializing,
+      initializing: session.isPending,
       async signIn(email, password) {
-        await signInWithEmailAndPassword(fbAuth(), email.trim(), password);
+        check(await authClient.signIn.email({ email: email.trim(), password }));
       },
       async signUp(name, email, password) {
-        const displayName = trimTo(name, LIMITS.displayName);
-        if (!displayName) throw new Error('Please enter your name.');
-        const cred = await createUserWithEmailAndPassword(fbAuth(), email.trim(), password);
-        await updateProfile(cred.user, { displayName });
-        await setDoc(doc(fbDb(), 'users', cred.user.uid), {
-          displayName,
-          email: cred.user.email ?? '',
-          createdAt: serverTimestamp(),
-        });
-        setUser(toAppUser(cred.user));
-      },
-      async resetPassword(email) {
-        await sendPasswordResetEmail(fbAuth(), email.trim());
+        const clean = trimTo(name, LIMITS.displayName);
+        if (!clean) throw new Error('Please enter your name.');
+        check(await authClient.signUp.email({ name: clean, email: email.trim(), password }));
       },
       async updateName(name) {
-        const u = fbAuth().currentUser;
-        const displayName = trimTo(name, LIMITS.displayName);
-        if (!u || !displayName) return;
-        await updateProfile(u, { displayName });
-        await setDoc(doc(fbDb(), 'users', u.uid), { displayName }, { merge: true });
-        // Update the name shown to friends in every group I'm in.
-        const groups = await getDocs(query(collection(fbDb(), 'groups'), where('memberIds', 'array-contains', u.uid)));
-        if (!groups.empty) {
-          const batch = writeBatch(fbDb());
-          groups.docs.forEach((g) =>
-            batch.update(g.ref, { [`members.${u.uid}.name`]: displayName, updatedAt: serverTimestamp() }),
-          );
-          await batch.commit();
-        }
-        setUser(toAppUser(u));
+        const clean = trimTo(name, LIMITS.displayName);
+        if (!clean) return;
+        await api('/api/me', { method: 'PATCH', json: { name: clean } });
+        await session.refetch();
+        await afterMutation();
       },
       async signOut() {
-        // Best effort: stop pushes to this device and clear local reminders for this account.
+        // Best effort: stop pushes to this phone and clear its reminders for this account.
         await unregisterThisDevice().catch(() => {});
         await cancelAllTaskReminders().catch(() => {});
-        await fbSignOut(fbAuth());
+        await authClient.signOut().catch(() => {});
+        queryClient.clear();
+        await session.refetch();
       },
     }),
-    [user, initializing],
+    [user, session],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -119,20 +100,20 @@ export function useUser(): AppUser {
 export function authErrorMessage(e: unknown): string {
   const code = (e as { code?: string })?.code ?? '';
   switch (code) {
-    case 'auth/invalid-email':
+    case 'INVALID_EMAIL':
       return 'That email address looks invalid.';
-    case 'auth/invalid-credential':
-    case 'auth/wrong-password':
-    case 'auth/user-not-found':
+    case 'INVALID_EMAIL_OR_PASSWORD':
+    case 'INVALID_PASSWORD':
+    case 'USER_NOT_FOUND':
+    case 'CREDENTIAL_ACCOUNT_NOT_FOUND':
       return 'Email or password is incorrect.';
-    case 'auth/email-already-in-use':
+    case 'USER_ALREADY_EXISTS':
+    case 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL':
       return 'An account already exists with this email.';
-    case 'auth/weak-password':
+    case 'PASSWORD_TOO_SHORT':
       return 'Password must be at least 6 characters.';
-    case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait a moment and try again.';
-    case 'auth/network-request-failed':
-      return 'No internet connection.';
+    case '429':
+      return 'Too many attempts. Please wait a minute and try again.';
     default:
       return (e as Error)?.message || 'Something went wrong.';
   }

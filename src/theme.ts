@@ -1,5 +1,5 @@
 import { useColorScheme } from 'react-native';
-import type { Priority, TaskStatus } from './lib/types';
+import type { Priority, TaskStatus } from '@shared/types';
 
 const light = {
   bg: '#F6F6F9',

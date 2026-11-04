@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
-import { subscribeGroup, subscribeMyGroups } from '../lib/groups';
-import type { Activity, Comment, Group, Task } from '../lib/types';
+import { ApiError } from '../lib/api';
+import { fetchGroup, fetchMyGroups } from '../lib/groups';
 import {
-  subscribeActivity,
-  subscribeAssignedTasks,
-  subscribeComments,
-  subscribeCreatedTasks,
-  subscribeGroupTasks,
-  subscribeTask,
+  fetchActivity,
+  fetchAssignedTasks,
+  fetchComments,
+  fetchCreatedTasks,
+  fetchGroupTasks,
+  fetchNotifications,
+  fetchTask,
 } from '../lib/tasks';
-
-type Subscribe<T> = (onData: (d: T) => void, onError: (e: Error) => void) => () => void;
 
 export interface Live<T> {
   data: T | undefined;
@@ -21,49 +21,46 @@ export interface Live<T> {
 }
 
 export function friendlyError(e: unknown): string {
-  const code = (e as { code?: string })?.code;
-  if (code === 'permission-denied') return "You don't have access to this (you may have been removed from the group).";
-  if (code === 'unavailable') return 'You appear to be offline. Changes will sync when you reconnect.';
-  if (code === 'failed-precondition') return 'The database needs an index for this view. See README → Deploy.';
+  if (e instanceof ApiError) {
+    if (e.status === 0) return `${e.message} Changes will need to be retried when you're back online.`;
+    if (e.status === 401) return 'Please sign in again.';
+    return e.message;
+  }
   return (e as Error)?.message || 'Something went wrong.';
 }
 
-/** Realtime Firestore subscription with loading/error/retry state. Pass key=null to skip. */
-export function useLive<T>(key: string | null, subscribe: Subscribe<T>): Live<T> {
-  const [data, setData] = useState<T | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (key == null) return;
-    setError(null);
-    setData(undefined);
-    const unsub = subscribe(
-      (d) => {
-        setData(d);
-        setError(null);
-      },
-      (e) => setError(friendlyError(e)),
-    );
-    return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, attempt]);
-
-  const retry = useCallback(() => setAttempt((a) => a + 1), []);
-  return { data, error, loading: key != null && data === undefined && !error, retry };
+/**
+ * Server data that refreshes itself every few seconds while the app is open
+ * (and immediately after any change you make). Pass key=null to skip.
+ */
+function useLive<T>(key: readonly unknown[] | null, fn: () => Promise<T>): Live<T> {
+  const q = useQuery({ queryKey: key ?? ['disabled'], queryFn: fn, enabled: key != null });
+  const retry = useCallback(() => void q.refetch(), [q]);
+  return {
+    data: q.data,
+    // Keep showing cached data during a transient refresh error.
+    error: q.error && q.data === undefined ? friendlyError(q.error) : null,
+    loading: key != null && q.isPending && !q.error,
+    retry,
+  };
 }
 
-export const useMyGroups = (uid: string) => useLive<Group[]>(`groups:${uid}`, (d, e) => subscribeMyGroups(uid, d, e));
-export const useGroup = (id: string | undefined) => useLive<Group | null>(id ? `group:${id}` : null, (d, e) => subscribeGroup(id!, d, e));
-export const useGroupTasks = (id: string | undefined) =>
-  useLive<Task[]>(id ? `gtasks:${id}` : null, (d, e) => subscribeGroupTasks(id!, d, e));
-export const useAssignedTasks = (uid: string) => useLive<Task[]>(`assigned:${uid}`, (d, e) => subscribeAssignedTasks(uid, d, e));
-export const useCreatedTasks = (uid: string) => useLive<Task[]>(`created:${uid}`, (d, e) => subscribeCreatedTasks(uid, d, e));
-export const useTask = (id: string | undefined) => useLive<Task | null>(id ? `task:${id}` : null, (d, e) => subscribeTask(id!, d, e));
-export const useComments = (id: string | undefined) =>
-  useLive<Comment[]>(id ? `comments:${id}` : null, (d, e) => subscribeComments(id!, d, e));
-export const useActivity = (id: string | undefined) =>
-  useLive<Activity[]>(id ? `activity:${id}` : null, (d, e) => subscribeActivity(id!, d, e));
+/** A 404 means "gone or not yours" — treat it as null rather than an error. */
+const orNull = <T,>(p: Promise<T>) =>
+  p.catch((e) => {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  });
+
+export const useMyGroups = (_uid: string) => useLive(['groups'], fetchMyGroups);
+export const useGroup = (id: string | undefined) => useLive(id ? ['group', id] : null, () => orNull(fetchGroup(id!)));
+export const useGroupTasks = (id: string | undefined) => useLive(id ? ['groupTasks', id] : null, () => fetchGroupTasks(id!));
+export const useAssignedTasks = (_uid: string) => useLive(['tasks', 'assigned'], fetchAssignedTasks);
+export const useCreatedTasks = (_uid: string) => useLive(['tasks', 'created'], fetchCreatedTasks);
+export const useTask = (id: string | undefined) => useLive(id ? ['task', id] : null, () => orNull(fetchTask(id!)));
+export const useComments = (id: string | undefined) => useLive(id ? ['comments', id] : null, () => fetchComments(id!));
+export const useActivity = (id: string | undefined) => useLive(id ? ['activity', id] : null, () => fetchActivity(id!));
+export const useNotifications = () => useLive(['notifications'], fetchNotifications);
 
 /** Wraps an async action with a busy flag and an error alert. */
 export function useAction() {

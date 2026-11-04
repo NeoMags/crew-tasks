@@ -14,7 +14,7 @@ import {
   normalizeInviteCode,
   progressForStatus,
   type SortableTask,
-} from '../../src/lib/logic.ts';
+} from '../src/shared/logic.js';
 
 const group = {
   members: {

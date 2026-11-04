@@ -1,9 +1,8 @@
 /**
- * Pure business logic (no Firebase / React Native imports) so it can be unit-tested in Node.
- * Permission helpers mirror firestore.rules — the rules are the real enforcement;
- * these only decide what the UI offers.
+ * Pure business logic shared by the API server (which enforces it) and the app
+ * (which uses it only to decide what to show). No I/O, so it is unit-tested directly.
  */
-import type { Group, Recurrence, Role, Task, TaskStatus } from './types';
+import type { Group, Recurrence, Role, Task, TaskStatus } from './types.js';
 
 export const LIMITS = {
   groupName: 60,

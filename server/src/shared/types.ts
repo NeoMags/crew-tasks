@@ -1,4 +1,5 @@
-import type { Timestamp } from 'firebase/firestore';
+/** API data shapes shared by the server and the app. Timestamps are ISO-8601 strings. */
+export type ISODate = string;
 
 export type Role = 'owner' | 'admin' | 'member';
 
@@ -14,10 +15,11 @@ export interface Group {
   ownerId: string;
   memberIds: string[];
   members: Record<string, MemberInfo>;
+  /** Any member may share the invite; only admins can reset it. */
   inviteCode: string;
-  inviteExpiresAt: Timestamp;
-  createdAt: Timestamp | null;
-  updatedAt: Timestamp | null;
+  inviteExpiresAt: ISODate;
+  createdAt: ISODate | null;
+  updatedAt: ISODate | null;
 }
 
 export const TASK_STATUSES = ['todo', 'in_progress', 'blocked', 'review', 'done'] as const;
@@ -36,18 +38,18 @@ export interface ChecklistItem {
   done: boolean;
   doneBy: string | null;
   doneByName: string | null;
-  doneAt: number | null; // epoch ms (serverTimestamp is not allowed inside arrays)
+  doneAt: ISODate | null;
 }
 
 export interface Attachment {
   id: string;
   name: string;
   url: string;
-  path: string;
   contentType: string;
-  uploadedBy: string;
+  uploadedBy: string | null;
   uploadedByName: string;
-  uploadedAt: number;
+  uploadedAt: ISODate;
+  sizeBytes: number;
 }
 
 export interface Task {
@@ -64,26 +66,25 @@ export interface Task {
   requiresApproval: boolean;
   priority: Priority;
   progress: number; // 0..100
-  dueAt: Timestamp | null;
+  dueAt: ISODate | null;
   recurrence: Recurrence;
   checklist: ChecklistItem[];
   attachments: Attachment[];
   nextTaskId: string | null;
   recurredFrom: string | null;
-  overdueNotified: boolean;
-  updatedBy: string;
-  createdAt: Timestamp | null;
-  updatedAt: Timestamp | null;
-  completedAt: Timestamp | null;
+  updatedBy: string | null;
+  createdAt: ISODate | null;
+  updatedAt: ISODate | null;
+  completedAt: ISODate | null;
 }
 
 export interface Comment {
   id: string;
-  authorId: string;
+  authorId: string | null;
   authorName: string;
   text: string;
   mentions: string[];
-  createdAt: Timestamp | null;
+  createdAt: ISODate | null;
 }
 
 export type ActivityType =
@@ -98,11 +99,11 @@ export type ActivityType =
 
 export interface Activity {
   id: string;
-  actorId: string;
+  actorId: string | null;
   actorName: string;
   type: ActivityType;
   message: string;
-  createdAt: Timestamp | null;
+  createdAt: ISODate | null;
 }
 
 export const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -126,3 +127,18 @@ export const RECURRENCE_LABEL: Record<Recurrence, string> = {
   weekly: 'Weekly',
   monthly: 'Monthly',
 };
+
+export interface AppNotification {
+  id: string;
+  taskId: string | null;
+  title: string;
+  body: string;
+  read: boolean;
+  createdAt: ISODate;
+}
+
+export interface Me {
+  id: string;
+  name: string;
+  email: string;
+}

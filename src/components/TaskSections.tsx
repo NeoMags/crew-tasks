@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { useAction, useActivity, useComments } from '../hooks/data';
 import type { AppUser } from '../lib/auth';
-import { allowedStatuses, canEditDetails, canWorkOn, checklistProgress, formatDue, LIMITS } from '../lib/logic';
+import { allowedStatuses, canEditDetails, canWorkOn, checklistProgress, formatDue, LIMITS } from '@shared/logic';
 import { addCustomReminder, cancelCustomReminder, listCustomReminders } from '../lib/reminders';
 import {
   addChecklistItem,
@@ -17,7 +17,7 @@ import {
   toggleChecklistItem,
   uploadAttachment,
 } from '../lib/tasks';
-import { STATUS_LABEL, type Group, type Task, type TaskStatus } from '../lib/types';
+import { STATUS_LABEL, type Group, type Task, type TaskStatus } from '@shared/types';
 import { radius, space, STATUS_COLOR, useTheme } from '../theme';
 import { pickDateTime } from './DateTimeField';
 import { Avatar, Body, Button, Card, Chip, IconButton, Muted, ProgressBar, SectionTitle, TextField } from './ui';
@@ -155,7 +155,7 @@ export function ChecklistSection({ task, user }: Props) {
               {item.done && item.doneByName ? (
                 <Muted style={{ fontSize: 12 }}>
                   by {item.doneByName}
-                  {item.doneAt ? ` · ${formatDue(item.doneAt)}` : ''}
+                  {item.doneAt ? ` · ${formatDue(Date.parse(item.doneAt))}` : ''}
                 </Muted>
               ) : null}
             </View>
@@ -223,7 +223,7 @@ export function AttachmentsSection({ task, group, user }: Props) {
               <Pressable style={{ flex: 1 }} onPress={() => Linking.openURL(a.url)} accessibilityRole="link">
                 <Body numberOfLines={1}>{a.name}</Body>
                 <Muted style={{ fontSize: 12 }}>
-                  {a.uploadedByName} · {formatDue(a.uploadedAt)}
+                  {a.uploadedByName} · {formatDue(Date.parse(a.uploadedAt))}
                 </Muted>
               </Pressable>
               {canRemove ? (
@@ -276,7 +276,7 @@ export function RemindersSection({ task }: Props) {
     d.setHours(9, 0, 0, 0);
     return d;
   };
-  const due = task.dueAt?.toMillis() ?? null;
+  const due = task.dueAt ? Date.parse(task.dueAt) : null;
 
   if (task.status === 'done') return null;
   return (
@@ -331,7 +331,7 @@ export function CommentsSection({ task, group, user }: Props) {
               <Text style={{ color: c.text, fontWeight: '600', fontSize: 13 }}>
                 {m.authorName}
                 <Text style={{ color: c.muted, fontWeight: '400' }}>
-                  {m.createdAt ? `  ·  ${formatDue(m.createdAt.toMillis())}` : '  ·  sending…'}
+                  {m.createdAt ? `  ·  ${formatDue(Date.parse(m.createdAt))}` : ''}
                 </Text>
               </Text>
               <Body>{m.text}</Body>
@@ -392,7 +392,7 @@ export function ActivitySection({ task }: { task: Task }) {
                 <Body>
                   <Text style={{ fontWeight: '600' }}>{a.actorName}</Text> {a.message}
                 </Body>
-                <Muted style={{ fontSize: 12 }}>{a.createdAt ? formatDue(a.createdAt.toMillis()) : 'just now'}</Muted>
+                <Muted style={{ fontSize: 12 }}>{a.createdAt ? formatDue(Date.parse(a.createdAt)) : 'just now'}</Muted>
               </View>
             </View>
           ))}

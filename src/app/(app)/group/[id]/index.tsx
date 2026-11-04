@@ -5,9 +5,9 @@ import { TaskRow } from '../../../../components/TaskRow';
 import { Avatar, Button, Chip, EmptyState, ErrorBanner, IconButton, Loading } from '../../../../components/ui';
 import { useGroup, useGroupTasks } from '../../../../hooks/data';
 import { useUser } from '../../../../lib/auth';
-import { compareTasks, isOpen, isOverdue } from '../../../../lib/logic';
+import { compareTasks, isOpen, isOverdue } from '@shared/logic';
 import { createdMs, dueMs } from '../../../../lib/tasks';
-import { STATUS_LABEL, TASK_STATUSES, type TaskStatus } from '../../../../lib/types';
+import { STATUS_LABEL, TASK_STATUSES, type TaskStatus } from '@shared/types';
 import { radius, space, useTheme } from '../../../../theme';
 
 type StatusFilter = 'open' | TaskStatus;

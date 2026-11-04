@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { onCommentNotes, onCreatedNotes, onUpdatedNotes, overdueNote, type TaskLike } from '../src/notifyLogic.ts';
+import { onCommentNotes, onCreatedNotes, onUpdatedNotes, overdueNote, type TaskLike } from '../src/notifyLogic.js';
 
 const base: TaskLike = {
   title: 'Book tickets',

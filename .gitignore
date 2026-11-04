@@ -41,12 +41,6 @@ yarn-error.*
 /android
 /android
 
-# Secrets / per-project Firebase config (provide via env or EAS secrets)
+# Secrets (provide via env, GitHub secrets or EAS)
 .env
 google-services.json
-functions/lib/
-functions/node_modules/
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
-.firebaserc

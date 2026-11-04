@@ -5,7 +5,7 @@ import { DateTimeField } from '../../../components/DateTimeField';
 import { Body, Button, Chip, EmptyState, IconButton, Loading, Muted, Screen, SectionTitle, TextField } from '../../../components/ui';
 import { useAction, useMyGroups, useTask } from '../../../hooks/data';
 import { useUser } from '../../../lib/auth';
-import { canEditDetails, LIMITS } from '../../../lib/logic';
+import { canEditDetails, LIMITS } from '@shared/logic';
 import { createTask, updateTaskDetails, type TaskInput } from '../../../lib/tasks';
 import {
   PRIORITIES,
@@ -14,7 +14,7 @@ import {
   RECURRENCE_LABEL,
   type Priority,
   type Recurrence,
-} from '../../../lib/types';
+} from '@shared/types';
 import { PRIORITY_COLOR, space, useTheme } from '../../../theme';
 
 /** Create a task (optionally for ?groupId) or edit one (?taskId). */
@@ -47,7 +47,7 @@ export default function TaskForm() {
     setDescription(t.description);
     setAssigneeIds(t.assigneeIds);
     setPriority(t.priority);
-    setDueAt(t.dueAt ? t.dueAt.toDate() : null);
+    setDueAt(t.dueAt ? new Date(t.dueAt) : null);
     setRecurrence(t.recurrence);
     setRequiresApproval(t.requiresApproval);
     setLoaded(true);
