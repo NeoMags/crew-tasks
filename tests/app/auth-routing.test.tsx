@@ -30,15 +30,15 @@ function routes(signedIn: boolean, withRedirects: boolean) {
 }
 
 test('signed out at "/" lands on Sign in (with redirectTo)', async () => {
-  await renderRouter(routes(false, true), { initialUrl: '/' });
+  const r = await renderRouter(routes(false, true), { initialUrl: '/' });
   expect(screen.getByText('Sign in')).toBeTruthy();
-  expect(screen).toHavePathname('/sign-in');
+  expect(r.getPathname()).toBe('/sign-in');
 });
 
 test('signed in at "/sign-in" lands on My tasks (with redirectTo)', async () => {
-  await renderRouter(routes(true, true), { initialUrl: '/sign-in' });
+  const r = await renderRouter(routes(true, true), { initialUrl: '/sign-in' });
   expect(screen.getByText('My tasks')).toBeTruthy();
-  expect(screen).toHavePathname('/');
+  expect(r.getPathname()).toBe('/');
 });
 
 test('signed in at "/" shows My tasks', async () => {
