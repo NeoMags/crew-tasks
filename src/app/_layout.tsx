@@ -67,10 +67,11 @@ function RootNavigator() {
         contentStyle: { backgroundColor: c.bg },
       }}
     >
-      <Stack.Protected guard={signedIn}>
+      {/* Explicit targets: the app opens at "/", which only exists inside (app). */}
+      <Stack.Protected guard={signedIn} redirectTo="/sign-in">
         <Stack.Screen name="(app)" options={{ headerShown: false }} />
       </Stack.Protected>
-      <Stack.Protected guard={!signedIn}>
+      <Stack.Protected guard={!signedIn} redirectTo="/">
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>

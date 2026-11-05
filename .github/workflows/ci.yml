@@ -20,6 +20,8 @@ jobs:
           npm ci
           npx tsc --noEmit
           npx expo lint
+      - name: App tests (routing)
+        run: npx jest --ci
       - name: Bundle Android JS (catches import/resolution errors)
         env:
           EXPO_PUBLIC_API_URL: https://ci.invalid
