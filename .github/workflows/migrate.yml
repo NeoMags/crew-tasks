@@ -1,0 +1,50 @@
+name: Set up / update database
+
+# Creates or updates the tables in your Neon database. Safe to run any number of times:
+# each migration is applied only once.
+# Needs the repository secret DATABASE_URL (Neon connection string; the unpooled/direct one is best).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['server/migrations/**', 'server/src/auth.ts']
+
+concurrency:
+  group: migrate
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secret
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Add the repository secret DATABASE_URL (Neon connection string) first — see README."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Only the table layout is derived from the auth config, so placeholders are fine here.
+          BETTER_AUTH_SECRET: migration-only-placeholder-secret-0000000000
+          BETTER_AUTH_URL: https://migrate.invalid
+        run: npm run migrate
