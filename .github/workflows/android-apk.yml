@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
-      EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
+      # Public server address (not a secret). Override with the repository variable API_URL.
+      EXPO_PUBLIC_API_URL: ${{ vars.API_URL || 'https://crew-tasks.vercel.app' }}
       EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
       ANDROID_PACKAGE: ${{ vars.ANDROID_PACKAGE }}
       EXPO_PUBLIC_ATTACHMENTS: ${{ vars.ATTACHMENTS }}
