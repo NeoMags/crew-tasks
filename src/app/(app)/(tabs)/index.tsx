@@ -2,13 +2,14 @@ import { router, Stack } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { TaskRow } from '../../../components/TaskRow';
+import { useNow } from '../../../hooks/useNow';
 import { Button, Chip, EmptyState, ErrorBanner, IconButton, Loading } from '../../../components/ui';
 import { useAssignedTasks, useCreatedTasks, useMyGroups } from '../../../hooks/data';
 import { useUser } from '../../../lib/auth';
-import { compareTasks, isDueToday, isOpen, isOverdue } from '../../../lib/logic';
+import { compareTasks, isDueToday, isOpen, isOverdue } from '@shared/logic';
 import { syncAutoReminders } from '../../../lib/reminders';
 import { createdMs, dueMs } from '../../../lib/tasks';
-import type { Task } from '../../../lib/types';
+import type { Task } from '@shared/types';
 import { radius, space, STATUS_COLOR, useTheme } from '../../../theme';
 
 type Scope = 'assigned' | 'created';
@@ -52,7 +53,7 @@ export default function MyTasks() {
 
   const groupById = useMemo(() => new Map((groups.data ?? []).map((g) => [g.id, g])), [groups.data]);
   const source = scope === 'assigned' ? assigned : created;
-  const now = Date.now();
+  const now = useNow();
 
   // Keep on-device due reminders in step with the tasks assigned to me.
   useEffect(() => {

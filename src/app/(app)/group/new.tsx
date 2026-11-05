@@ -4,7 +4,7 @@ import { Button, Muted, Screen, TextField } from '../../../components/ui';
 import { useAction } from '../../../hooks/data';
 import { useUser } from '../../../lib/auth';
 import { createGroup } from '../../../lib/groups';
-import { LIMITS } from '../../../lib/logic';
+import { LIMITS } from '@shared/logic';
 
 export default function NewGroup() {
   const user = useUser();
@@ -41,7 +41,7 @@ export default function NewGroup() {
           })
         }
       />
-      <Muted>You'll get an invite code to share with friends.</Muted>
+      <Muted>You’ll get an invite code to share with friends.</Muted>
     </Screen>
   );
 }

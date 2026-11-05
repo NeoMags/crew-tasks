@@ -1,7 +1,7 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
-import { formatDue } from '../lib/logic';
+import { formatDue } from '@shared/logic';
 import { radius, useTheme } from '../theme';
 import { Button } from './ui';
 

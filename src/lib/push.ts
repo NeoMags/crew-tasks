@@ -1,11 +1,16 @@
+/**
+ * Server push via Expo's push service. On Android, Expo delivers through Google FCM,
+ * so a build needs google-services.json and an EAS project id for push to work.
+ * Without them, everything else (in-app inbox, local reminders) still works.
+ */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { Platform } from 'react-native';
-import { fbAuth, fbDb } from './firebase';
+import { api } from './api';
 
-const DEVICE_ID_KEY = 'crewtasks.deviceId';
+const TOKEN_KEY = 'crewtasks.expoPushToken';
 
 export const CHANNELS = {
   default: 'default',
@@ -25,65 +30,51 @@ export async function ensureChannels(): Promise<void> {
   });
 }
 
-async function deviceId(): Promise<string> {
-  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
-  if (!id) {
-    id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
-  }
-  return id;
-}
-
 export type PushSetupResult =
   | { ok: true }
-  | { ok: false; reason: 'permission-denied' | 'not-a-device' | 'token-error'; detail?: string };
+  | { ok: false; reason: 'permission-denied' | 'not-a-device' | 'not-configured' | 'token-error'; detail?: string };
 
 export async function requestNotificationPermission(): Promise<boolean> {
   await ensureChannels();
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
   if (!current.canAskAgain) return false;
-  const next = await Notifications.requestPermissionsAsync();
-  return next.granted;
+  return (await Notifications.requestPermissionsAsync()).granted;
 }
 
-async function saveToken(token: string) {
-  const uid = fbAuth().currentUser?.uid;
-  if (!uid) return;
-  await setDoc(doc(fbDb(), 'users', uid, 'devices', await deviceId()), {
-    token,
-    platform: Platform.OS,
-    updatedAt: serverTimestamp(),
-  });
+function easProjectId(): string | undefined {
+  const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
+  return extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? undefined;
 }
 
-/**
- * Registers this device's FCM token so Cloud Functions can push task updates.
- * Requires google-services.json in the build; without it, local reminders still work.
- */
+/** Asks for permission (needed for local reminders too) and registers for server push if configured. */
 export async function registerForPush(): Promise<PushSetupResult> {
-  if (!Device.isDevice) return { ok: false, reason: 'not-a-device' };
   const granted = await requestNotificationPermission();
   if (!granted) return { ok: false, reason: 'permission-denied' };
+  if (!Device.isDevice) return { ok: false, reason: 'not-a-device' };
+  const projectId = easProjectId();
+  if (!projectId) return { ok: false, reason: 'not-configured' };
   try {
-    const { data } = await Notifications.getDevicePushTokenAsync();
-    await saveToken(String(data));
+    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    await api('/api/devices', { json: { token, platform: Platform.OS } });
+    await AsyncStorage.setItem(TOKEN_KEY, token);
     return { ok: true };
   } catch (e) {
     return { ok: false, reason: 'token-error', detail: (e as Error)?.message };
   }
 }
 
-/** Keeps the stored token fresh if FCM rotates it. Returns an unsubscribe function. */
+/** Re-registers if FCM rotates the device token. Returns an unsubscribe function. */
 export function watchPushToken(): () => void {
-  const sub = Notifications.addPushTokenListener(({ data }) => {
-    saveToken(String(data)).catch(() => {});
+  const sub = Notifications.addPushTokenListener(() => {
+    registerForPush().catch(() => {});
   });
   return () => sub.remove();
 }
 
 export async function unregisterThisDevice(): Promise<void> {
-  const uid = fbAuth().currentUser?.uid;
-  if (!uid) return;
-  await deleteDoc(doc(fbDb(), 'users', uid, 'devices', await deviceId()));
+  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  if (!token) return;
+  await api('/api/devices', { method: 'DELETE', json: { token } });
+  await AsyncStorage.removeItem(TOKEN_KEY);
 }

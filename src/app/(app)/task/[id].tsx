@@ -13,13 +13,13 @@ import {
 import { Avatar, Body, Card, ErrorBanner, IconButton, Loading, Muted, Pill, Screen } from '../../../components/ui';
 import { useAction, useGroup, useTask } from '../../../hooks/data';
 import { useUser } from '../../../lib/auth';
-import { canEditDetails, formatDue, isOverdue } from '../../../lib/logic';
+import { canEditDetails, formatDue, isOverdue } from '@shared/logic';
 import { deleteTask, dueMs } from '../../../lib/tasks';
-import { PRIORITY_LABEL, RECURRENCE_LABEL } from '../../../lib/types';
+import { PRIORITY_LABEL, RECURRENCE_LABEL } from '@shared/types';
 import { PRIORITY_COLOR, space, useTheme } from '../../../theme';
 
-// Photo attachments need Cloud Storage, which requires the Firebase Blaze plan.
-// Build with EXPO_PUBLIC_ATTACHMENTS=off to hide them on the free Spark plan.
+// Photo attachments need the server's Vercel Blob store (BLOB_READ_WRITE_TOKEN).
+// Build with EXPO_PUBLIC_ATTACHMENTS=off to hide them if you don't set one up.
 const ATTACHMENTS_ENABLED = process.env.EXPO_PUBLIC_ATTACHMENTS !== 'off';
 
 export default function TaskDetail() {

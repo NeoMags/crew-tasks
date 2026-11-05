@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { Button, Screen, TextField } from '../../components/ui';
 import { authErrorMessage, useAuth } from '../../lib/auth';
 import { space, useTheme } from '../../theme';
 
 export default function SignIn() {
   const c = useTheme();
-  const { signIn, resetPassword } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -27,15 +27,7 @@ export default function SignIn() {
     }
   };
 
-  const forgot = async () => {
-    if (!email.trim()) return setError('Enter your email first, then tap "Forgot password".');
-    try {
-      await resetPassword(email);
-      Alert.alert('Check your email', 'We sent a link to reset your password.');
-    } catch (e) {
-      setError(authErrorMessage(e));
-    }
-  };
+  const forgot = () => router.push({ pathname: '/reset', params: { email: email.trim() } });
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

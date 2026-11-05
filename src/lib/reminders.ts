@@ -1,12 +1,12 @@
 /**
- * Local (on-device) reminders. These work without any server and without the
- * Firebase Blaze plan. Server pushes (Cloud Functions) cover assignment, status,
+ * Local (on-device) reminders. These work without any server or push setup.
+ * Server-side notifications (in-app Inbox + optional push) cover assignment, status,
  * comment and overdue events, so the two don't duplicate each other.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { CHANNELS } from './push';
-import type { TaskStatus } from './types';
+import type { TaskStatus } from '@shared/types';
 
 const STORE_KEY = 'crewtasks.reminders.v1';
 const SETTINGS_KEY = 'crewtasks.autoReminders';

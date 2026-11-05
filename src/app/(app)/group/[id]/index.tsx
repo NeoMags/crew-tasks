@@ -2,12 +2,13 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, Share, Text, View } from 'react-native';
 import { TaskRow } from '../../../../components/TaskRow';
+import { useNow } from '../../../../hooks/useNow';
 import { Avatar, Button, Chip, EmptyState, ErrorBanner, IconButton, Loading } from '../../../../components/ui';
 import { useGroup, useGroupTasks } from '../../../../hooks/data';
 import { useUser } from '../../../../lib/auth';
-import { compareTasks, isOpen, isOverdue } from '../../../../lib/logic';
+import { compareTasks, isOpen, isOverdue } from '@shared/logic';
 import { createdMs, dueMs } from '../../../../lib/tasks';
-import { STATUS_LABEL, TASK_STATUSES, type TaskStatus } from '../../../../lib/types';
+import { STATUS_LABEL, TASK_STATUSES, type TaskStatus } from '@shared/types';
 import { radius, space, useTheme } from '../../../../theme';
 
 type StatusFilter = 'open' | TaskStatus;
@@ -20,7 +21,7 @@ export default function GroupBoard() {
   const tasks = useGroupTasks(id);
   const [status, setStatus] = useState<StatusFilter>('open');
   const [member, setMember] = useState<string | null>(null);
-  const now = Date.now();
+  const now = useNow();
 
   const perMember = useMemo(() => {
     const g = group.data;

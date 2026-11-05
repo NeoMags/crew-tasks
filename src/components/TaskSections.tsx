@@ -3,8 +3,9 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { useAction, useActivity, useComments } from '../hooks/data';
+import { useNow } from '../hooks/useNow';
 import type { AppUser } from '../lib/auth';
-import { allowedStatuses, canEditDetails, canWorkOn, checklistProgress, formatDue, LIMITS } from '../lib/logic';
+import { allowedStatuses, canEditDetails, canWorkOn, checklistProgress, formatDue, LIMITS } from '@shared/logic';
 import { addCustomReminder, cancelCustomReminder, listCustomReminders } from '../lib/reminders';
 import {
   addChecklistItem,
@@ -17,7 +18,7 @@ import {
   toggleChecklistItem,
   uploadAttachment,
 } from '../lib/tasks';
-import { STATUS_LABEL, type Group, type Task, type TaskStatus } from '../lib/types';
+import { STATUS_LABEL, type Group, type Task, type TaskStatus } from '@shared/types';
 import { radius, space, STATUS_COLOR, useTheme } from '../theme';
 import { pickDateTime } from './DateTimeField';
 import { Avatar, Body, Button, Card, Chip, IconButton, Muted, ProgressBar, SectionTitle, TextField } from './ui';
@@ -130,7 +131,7 @@ export function ChecklistSection({ task, user }: Props) {
 
   return (
     <>
-      <SectionTitle right={total ? <Muted>{done}/{total} furnished</Muted> : null}>What's needed</SectionTitle>
+      <SectionTitle right={total ? <Muted>{done}/{total} furnished</Muted> : null}>What’s needed</SectionTitle>
       <Card style={{ gap: space.md }}>
         {task.checklist.length === 0 ? <Muted>Nothing listed. Add documents, money, items or info that must be furnished.</Muted> : null}
         {task.checklist.map((item) => (
@@ -155,7 +156,7 @@ export function ChecklistSection({ task, user }: Props) {
               {item.done && item.doneByName ? (
                 <Muted style={{ fontSize: 12 }}>
                   by {item.doneByName}
-                  {item.doneAt ? ` · ${formatDue(item.doneAt)}` : ''}
+                  {item.doneAt ? ` · ${formatDue(Date.parse(item.doneAt))}` : ''}
                 </Muted>
               ) : null}
             </View>
@@ -223,7 +224,7 @@ export function AttachmentsSection({ task, group, user }: Props) {
               <Pressable style={{ flex: 1 }} onPress={() => Linking.openURL(a.url)} accessibilityRole="link">
                 <Body numberOfLines={1}>{a.name}</Body>
                 <Muted style={{ fontSize: 12 }}>
-                  {a.uploadedByName} · {formatDue(a.uploadedAt)}
+                  {a.uploadedByName} · {formatDue(Date.parse(a.uploadedAt))}
                 </Muted>
               </Pressable>
               {canRemove ? (
@@ -276,7 +277,8 @@ export function RemindersSection({ task }: Props) {
     d.setHours(9, 0, 0, 0);
     return d;
   };
-  const due = task.dueAt?.toMillis() ?? null;
+  const due = task.dueAt ? Date.parse(task.dueAt) : null;
+  const now = useNow();
 
   if (task.status === 'done') return null;
   return (
@@ -286,7 +288,7 @@ export function RemindersSection({ task }: Props) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
           <Chip label="In 1 hour" onPress={() => add(inOneHour())} />
           <Chip label="Tomorrow 9 AM" onPress={() => add(tomorrow9())} />
-          {due && due - 86_400_000 > Date.now() ? <Chip label="1 day before due" onPress={() => add(new Date(due - 86_400_000))} /> : null}
+          {due && due - 86_400_000 > now ? <Chip label="1 day before due" onPress={() => add(new Date(due - 86_400_000))} /> : null}
           <Chip label="Pick time…" onPress={() => pickDateTime(inOneHour(), add)} />
         </View>
         {list.map((r) => (
@@ -331,7 +333,7 @@ export function CommentsSection({ task, group, user }: Props) {
               <Text style={{ color: c.text, fontWeight: '600', fontSize: 13 }}>
                 {m.authorName}
                 <Text style={{ color: c.muted, fontWeight: '400' }}>
-                  {m.createdAt ? `  ·  ${formatDue(m.createdAt.toMillis())}` : '  ·  sending…'}
+                  {m.createdAt ? `  ·  ${formatDue(Date.parse(m.createdAt))}` : ''}
                 </Text>
               </Text>
               <Body>{m.text}</Body>
@@ -392,7 +394,7 @@ export function ActivitySection({ task }: { task: Task }) {
                 <Body>
                   <Text style={{ fontWeight: '600' }}>{a.actorName}</Text> {a.message}
                 </Body>
-                <Muted style={{ fontSize: 12 }}>{a.createdAt ? formatDue(a.createdAt.toMillis()) : 'just now'}</Muted>
+                <Muted style={{ fontSize: 12 }}>{a.createdAt ? formatDue(Date.parse(a.createdAt)) : 'just now'}</Muted>
               </View>
             </View>
           ))}

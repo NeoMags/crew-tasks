@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { Button, Muted, Screen, TextField } from '../../components/ui';
 import { authErrorMessage, useAuth } from '../../lib/auth';
-import { LIMITS } from '../../lib/logic';
+import { LIMITS } from '@shared/logic';
 
 export default function SignUp() {
   const { signUp } = useAuth();

@@ -1,12 +1,13 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Share, Text, View } from 'react-native';
 import { Avatar, Body, Button, Card, ErrorBanner, Loading, Muted, Screen, SectionTitle, TextField } from '../../../../components/ui';
 import { useAction, useGroup } from '../../../../hooks/data';
+import { useNow } from '../../../../hooks/useNow';
 import { useUser } from '../../../../lib/auth';
 import { deleteGroup, regenerateInvite, removeMember, setMemberRole, updateGroupInfo } from '../../../../lib/groups';
-import { isAdmin, LIMITS } from '../../../../lib/logic';
+import { isAdmin, LIMITS } from '@shared/logic';
 import { space, useTheme } from '../../../../theme';
 
 export default function GroupSettings() {
@@ -15,15 +16,10 @@ export default function GroupSettings() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const group = useGroup(id);
   const { busy, run } = useAction();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-
-  useEffect(() => {
-    if (group.data) {
-      setName(group.data.name);
-      setDescription(group.data.description);
-    }
-  }, [group.data?.name, group.data?.description]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Drafts stay null until edited, so the fields show the latest saved values.
+  const [nameDraft, setName] = useState<string | null>(null);
+  const [descriptionDraft, setDescription] = useState<string | null>(null);
+  const now = useNow();
 
   if (group.loading) return <Loading />;
   if (!group.data) return <Screen><ErrorBanner message={group.error ?? 'Group not found.'} /></Screen>;
@@ -31,8 +27,10 @@ export default function GroupSettings() {
   const g = group.data;
   const admin = isAdmin(g, user.uid);
   const owner = g.ownerId === user.uid;
-  const expires = g.inviteExpiresAt.toDate();
-  const expired = expires.getTime() < Date.now();
+  const expires = new Date(g.inviteExpiresAt);
+  const expired = expires.getTime() < now;
+  const name = nameDraft ?? g.name;
+  const description = descriptionDraft ?? g.description;
 
   const confirm = (title: string, msg: string, action: string, fn: () => void) =>
     Alert.alert(title, msg, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: fn }]);
